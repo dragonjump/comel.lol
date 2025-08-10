@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>3D Flying Game - Sky Adventure</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+  <style>
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      background: linear-gradient(135deg, #87CEEB 0%, #98D8E8 50%, #B0E0E6 100%);
+      color: #ffffff; 
+      font-family: 'Arial', sans-serif; 
+      overflow: hidden;
+    }
+    
+    #gameContainer { 
+      position: fixed; 
+      inset: 0; 
+      overflow: hidden; 
+    }
+    
+    canvas { 
+      display: block; 
+      outline: none; 
+    }
+
+    /* Game HUD */
+    .gameHUD {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      padding: 15px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+    }
+    
+    .gameHUD h1 { 
+      margin: 0 0 15px; 
+      font-size: 24px; 
+      text-align: center;
+      color: #FFD700;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    }
+    
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .control-group {
+      text-align: center;
+    }
+    
+    .control-group h3 {
+      margin: 0 0 5px;
+      font-size: 14px;
+      color: #FFD700;
+    }
+    
+    .control-group p {
+      margin: 0;
+      font-size: 12px;
+      color: #E0E0E0;
+    }
+    
+    .plane-switcher {
+      text-align: center;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .plane-switcher h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #FFD700;
+    }
+    
+    .plane-keys {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .plane-key {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #FFD700;
+      min-width: 40px;
+      text-align: center;
+    }
+    
+    .plane-key.active {
+      background: rgba(255, 215, 0, 0.3);
+      border-color: #FFD700;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+
+    /* Game Stats */
+    .gameStats {
+      position: fixed;
+      right: 20px;
+      top: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      padding: 15px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      min-width: 150px;
+      z-index: 1000;
+    }
+    
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .stat-label {
+      color: #E0E0E0;
+    }
+    
+    .stat-value {
+      color: #FFD700;
+      font-weight: bold;
+    }
+    
+    /* Loading Screen */
+    .loadingScreen {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #87CEEB 0%, #98D8E8 50%, #B0E0E6 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      transition: opacity 0.5s ease-out;
+    }
+    
+    .loadingScreen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loadingText {
+      font-size: 32px;
+      color: #FFD700;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-bottom: 20px;
+    }
+    
+    .loadingBar {
+      width: 300px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid rgba(255, 255, 255, 0.5);
+    }
+    
+    .loadingProgress {
+      height: 100%;
+      background: linear-gradient(90deg, #FFD700, #FFA500);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div class="loadingScreen" id="loadingScreen">
+    <div class="loadingText">Loading 3D Flying Game...</div>
+    <div class="loadingBar">
+      <div class="loadingProgress" id="loadingProgress"></div>
+    </div>
+  </div>
+
+  <div id="gameContainer"></div>
+
+  <!-- Game HUD -->
+  <div class="gameHUD">
+    <h1>🚁 Sky Adventure</h1>
+    
+    <div class="controls">
+      <div class="control-group">
+        <h3>Flight Controls</h3>
+        <p>W/S - Pitch Up/Down</p>
+        <p>A/D - Turn Left/Right</p>
+        <p>Q/E - Roll Left/Right</p>
+      </div>
+      
+      <div class="control-group">
+        <h3>Speed Controls</h3>
+        <p>Shift - Increase Speed</p>
+        <p>Ctrl - Decrease Speed</p>
+        <p>R - Reset Position</p>
+      </div>
+    </div>
+    
+    <div class="plane-switcher">
+      <h3>Switch Planes</h3>
+      <div class="plane-keys">
+        <div class="plane-key" id="plane1">1</div>
+        <div class="plane-key" id="plane2">2</div>
+        <div class="plane-key" id="plane3">3</div>
+        <div class="plane-key" id="plane4">4</div>
+        <div class="plane-key" id="plane5">5</div>
+        <div class="plane-key" id="plane6">6</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Stats -->
+  <div class="gameStats">
+    <div class="stat-item">
+      <span class="stat-label">Speed:</span>
+      <span class="stat-value" id="speedValue">0 km/h</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Altitude:</span>
+      <span class="stat-value" id="altitudeValue">0 m</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Throttle:</span>
+      <span class="stat-value" id="throttleValue">50%</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">FPS:</span>
+      <span class="stat-value" id="fpsValue">60</span>
+    </div>
+  </div>
+
+  <script type="module">
+    // Game state
+    let gameLoaded = false;
+    let currentPlaneIndex = 0;
+    const planeFiles = ['plane1.glb', 'plane2.glb', 'plane3.glb', 'plane4.glb', 'plane5.glb', 'plane6.glb'];
+    
+    // Three.js components
+    let THREE, GLTFLoader;
+    let scene, camera, renderer;
+    let planePivot, currentPlane, currentPlaneMixer;
+    let mixers = new Set();
+    
+         // Flight physics
+     let flight;
+    
+    // Input state
+    const input = {
+      pitch: 0, yaw: 0, roll: 0, throttle: 0.5
+    };
+    
+    // Camera follow
+    let camRig, camTarget;
+    
+    // Loading progress
+    let loadingProgress = 0;
+    const totalAssets = planeFiles.length + 1; // +1 for scene
+    
+    // Update loading bar
+    function updateLoadingProgress() {
+      loadingProgress++;
+      const percentage = (loadingProgress / totalAssets) * 100;
+      document.getElementById('loadingProgress').style.width = percentage + '%';
+      
+      if (loadingProgress >= totalAssets) {
+        setTimeout(() => {
+          document.getElementById('loadingScreen').classList.add('hidden');
+          gameLoaded = true;
+        }, 500);
+      }
+    }
+    
+         // Load Three.js
+     async function loadThreeJS() {
+       try {
+         // Try esm.sh first (more reliable)
+         THREE = await import('https://esm.sh/three@0.158.0');
+         GLTFLoader = await import('https://esm.sh/three@0.158.0/examples/jsm/loaders/GLTFLoader.js');
+         GLTFLoader = GLTFLoader.GLTFLoader;
+         
+         console.log('Three.js loaded successfully from ESM.sh');
+         initGame();
+         
+       } catch (e) {
+         console.warn('ESM.sh failed, trying alternative CDN:', e);
+         
+         try {
+           // Fallback to unpkg
+           THREE = await import('https://unpkg.com/three@0.158.0/build/three.module.js');
+           GLTFLoader = await import('https://unpkg.com/three@0.158.0/examples/jsm/loaders/GLTFLoader.js');
+           GLTFLoader = GLTFLoader.GLTFLoader;
+           
+           console.log('Three.js loaded successfully from unpkg');
+           initGame();
+           
+         } catch (e2) {
+           console.error('All CDNs failed:', e2);
+           document.getElementById('loadingScreen').innerHTML = '<div class="loadingText">Error: Failed to load Three.js from all CDNs. Please check your internet connection and refresh the page.</div>';
+         }
+       }
+     }
+    
+         // Initialize the game
+     function initGame() {
+       // Initialize flight physics after Three.js is loaded
+       flight = {
+         speed: 0,
+         speedMin: 8,
+         speedMax: 150,
+         accel: 20,
+         decel: 25,
+         turnRate: THREE.MathUtils.degToRad(70),
+         pitchRate: THREE.MathUtils.degToRad(60),
+         rollRate: THREE.MathUtils.degToRad(120),
+         autoLevel: THREE.MathUtils.degToRad(25)
+       };
+       
+       // Scene setup
+       scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB);
+      scene.fog = new THREE.Fog(0x87CEEB, 100, 1000);
+      
+      // Camera setup
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+      camera.position.set(0, 5, 15);
+      
+             // Renderer setup
+       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+       renderer.setSize(window.innerWidth, window.innerHeight);
+       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+       renderer.shadowMap.enabled = false; // Disabled shadows for better performance
+       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      document.getElementById('gameContainer').appendChild(renderer.domElement);
+      
+      // Lighting
+      setupLighting();
+      
+      // Ground and sky
+      createEnvironment();
+      
+      // Flight controls
+      setupFlightControls();
+      
+      // Camera follow system
+      setupCameraFollow();
+      
+      // Load assets
+      loadAssets();
+      
+      // Start game loop
+      gameLoop();
+      
+      // Handle window resize
+      window.addEventListener('resize', onWindowResize);
+    }
+    
+         // Setup lighting
+     function setupLighting() {
+       // Much brighter ambient light to make planes visible
+       const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+       scene.add(ambientLight);
+       
+       // Brighter directional light (sun)
+       const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+       directionalLight.position.set(100, 100, 50);
+       directionalLight.castShadow = false; // Disabled shadows
+       scene.add(directionalLight);
+       
+       // Brighter hemisphere light for sky
+       const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0xffffff, 1.2);
+       scene.add(hemisphereLight);
+       
+       // Additional fill light from below to eliminate dark areas
+       const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
+       fillLight.position.set(0, -50, 0);
+       scene.add(fillLight);
+     }
+    
+    // Create environment
+    function createEnvironment() {
+             // Ground - much brighter to eliminate dark areas
+       const groundGeometry = new THREE.PlaneGeometry(2000, 2000);
+       const groundMaterial = new THREE.MeshStandardMaterial({ 
+         color: 0x98FB98, // Brighter green
+         roughness: 0.3,  // Less rough for more brightness
+         metalness: 0.0   // No metalness for cleaner look
+       });
+       const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+       ground.rotation.x = -Math.PI / 2;
+       ground.position.y = -0.1;
+       scene.add(ground);
+      
+      // Sky dome
+      const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+      const skyMaterial = new THREE.MeshBasicMaterial({
+        color: 0x87CEEB,
+        side: THREE.BackSide
+      });
+      const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+      scene.add(sky);
+      
+      // Clouds (simple spheres)
+      for (let i = 0; i < 20; i++) {
+        const cloudGeometry = new THREE.SphereGeometry(Math.random() * 30 + 20, 8, 8);
+        const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+        const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        cloud.position.set(
+          (Math.random() - 0.5) * 800,
+          Math.random() * 100 + 50,
+          (Math.random() - 0.5) * 800
+        );
+        scene.add(cloud);
+      }
+    }
+    
+    // Setup flight controls
+    function setupFlightControls() {
+      // Create plane pivot
+      planePivot = new THREE.Group();
+      planePivot.position.set(0, 10, 0);
+      scene.add(planePivot);
+      
+      // Keyboard controls
+      const keyState = {};
+      
+             window.addEventListener('keydown', (e) => {
+         keyState[e.code] = true;
+         
+         // Only allow controls after game is loaded
+         if (!gameLoaded) return;
+         
+         // Plane switching
+         if (e.code >= 'Digit1' && e.code <= 'Digit6') {
+           const planeIndex = parseInt(e.code.slice(-1)) - 1;
+           if (planeIndex < planeFiles.length) {
+             switchPlane(planeIndex);
+           }
+         }
+         
+         // Reset position
+         if (e.code === 'KeyR') {
+           resetPlanePosition();
+         }
+       });
+      
+      window.addEventListener('keyup', (e) => {
+        keyState[e.code] = false;
+      });
+      
+      // Update input state
+      function updateInput() {
+        input.pitch = (keyState['KeyW'] ? -1 : 0) + (keyState['KeyS'] ? 1 : 0);
+        input.yaw = (keyState['KeyA'] ? 1 : 0) + (keyState['KeyD'] ? -1 : 0);
+        input.roll = (keyState['KeyQ'] ? 1 : 0) + (keyState['KeyE'] ? -1 : 0);
+        
+        if (keyState['ShiftLeft'] || keyState['ShiftRight']) {
+          input.throttle = Math.min(1, input.throttle + 0.8 * 0.016);
+        }
+        if (keyState['ControlLeft'] || keyState['ControlRight']) {
+          input.throttle = Math.max(0, input.throttle - 0.8 * 0.016);
+        }
+      }
+      
+      // Store update function globally
+      window.updateInput = updateInput;
+    }
+    
+         // Setup camera follow
+     function setupCameraFollow() {
+       camRig = new THREE.Group();
+       camTarget = new THREE.Object3D();
+       
+       planePivot.add(camRig);
+       planePivot.add(camTarget);
+       
+       // Camera positioned very close to the plane
+       camTarget.position.set(0, 0, 0);     // Look at the plane itself
+       camRig.position.set(0, 0, -1.5);    // Camera very close to the plane
+       camRig.add(camera);
+     }
+    
+    // Load assets
+    async function loadAssets() {
+      const loader = new GLTFLoader();
+      
+      try {
+        // Load scene
+        const sceneGLTF = await loader.loadAsync('scene.glb');
+        const sceneModel = sceneGLTF.scene;
+        sceneModel.scale.setScalar(10);
+        scene.add(sceneModel);
+        updateLoadingProgress();
+        
+        // Load all planes
+        for (let i = 0; i < planeFiles.length; i++) {
+          try {
+            const planeGLTF = await loader.loadAsync(planeFiles[i]);
+            const planeModel = planeGLTF.scene;
+            
+                         // Setup plane model
+             planeModel.traverse((child) => {
+               if (child.isMesh) {
+                 // No shadow settings for better performance
+               }
+             });
+            
+            // Store loaded plane
+            if (i === 0) {
+              // First plane becomes active
+              setupPlane(planeModel, planeGLTF);
+            }
+            
+            updateLoadingProgress();
+            
+          } catch (e) {
+            console.warn(`Failed to load ${planeFiles[i]}:`, e);
+            updateLoadingProgress();
+          }
+        }
+        
+      } catch (e) {
+        console.error('Failed to load assets:', e);
+        updateLoadingProgress();
+      }
+    }
+    
+    // Setup plane
+    function setupPlane(planeModel, planeGLTF) {
+      // Remove current plane
+      if (currentPlane) {
+        planePivot.remove(currentPlane);
+        if (currentPlaneMixer) {
+          mixers.delete(currentPlaneMixer);
+          currentPlaneMixer = null;
+        }
+      }
+      
+      // Add new plane
+      currentPlane = planeModel;
+      planePivot.add(currentPlane);
+      
+      // Setup animations
+      if (planeGLTF.animations && planeGLTF.animations.length > 0) {
+        currentPlaneMixer = new THREE.AnimationMixer(currentPlane);
+        const action = currentPlaneMixer.clipAction(planeGLTF.animations[0]);
+        action.play();
+        mixers.add(currentPlaneMixer);
+      }
+      
+      // Update UI
+      updatePlaneUI();
+    }
+    
+    // Switch plane
+    function switchPlane(planeIndex) {
+      if (planeIndex === currentPlaneIndex || !gameLoaded) return;
+      
+      currentPlaneIndex = planeIndex;
+      
+      // Load the new plane
+      const loader = new GLTFLoader();
+      loader.loadAsync(planeFiles[planeIndex])
+        .then((planeGLTF) => {
+          setupPlane(planeGLTF.scene, planeGLTF);
+        })
+        .catch((e) => {
+          console.error(`Failed to load ${planeFiles[planeIndex]}:`, e);
+        });
+    }
+    
+    // Update plane UI
+    function updatePlaneUI() {
+      // Remove active class from all
+      document.querySelectorAll('.plane-key').forEach(key => key.classList.remove('active'));
+      
+      // Add active class to current
+      const currentKey = document.getElementById(`plane${currentPlaneIndex + 1}`);
+      if (currentKey) {
+        currentKey.classList.add('active');
+      }
+    }
+    
+         // Reset plane position
+     function resetPlanePosition() {
+       if (!flight) return; // Don't reset if flight physics not initialized yet
+       planePivot.position.set(0, 10, 0);
+       planePivot.rotation.set(0, 0, 0);
+       flight.speed = THREE.MathUtils.lerp(flight.speedMin, flight.speedMax, input.throttle);
+     }
+    
+    // Window resize handler
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    // Game loop
+    function gameLoop() {
+      if (!gameLoaded) {
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+      
+      const deltaTime = 0.016; // Fixed time step for consistent physics
+      
+      // Update input
+      if (window.updateInput) window.updateInput();
+      
+      // Update flight physics
+      updateFlightPhysics(deltaTime);
+      
+      // Update camera
+      updateCamera(deltaTime);
+      
+      // Update animations
+      mixers.forEach(mixer => mixer.update(deltaTime));
+      
+      // Update HUD
+      updateHUD();
+      
+      // Render
+      renderer.render(scene, camera);
+      
+      requestAnimationFrame(gameLoop);
+    }
+    
+         // Update flight physics
+     function updateFlightPhysics(deltaTime) {
+       // TEMPORARILY COMMENTED OUT - PLANE MOVEMENT DISABLED
+       /*
+       // Update speed based on throttle
+       const targetSpeed = THREE.MathUtils.lerp(flight.speedMin, flight.speedMax, input.throttle);
+       const accel = targetSpeed > flight.speed ? flight.accel : flight.decel;
+       flight.speed += (targetSpeed - flight.speed) * (1 - Math.exp(-accel * deltaTime));
+       
+       // Apply rotations
+       const speedFactor = Math.min(1, (flight.speed - flight.speedMin) / (flight.speedMax - flight.speedMin));
+       const pitch = input.pitch * flight.pitchRate * deltaTime * (0.6 + 0.4 * speedFactor);
+       const yaw = input.yaw * flight.turnRate * deltaTime * (0.6 + 0.4 * speedFactor);
+       const roll = input.roll * flight.rollRate * deltaTime * (0.6 + 0.4 * speedFactor);
+       
+       planePivot.rotateX(pitch);
+       planePivot.rotateY(yaw);
+       planePivot.rotateZ(roll);
+       
+       // Auto-level roll when no input
+       if (Math.abs(input.roll) < 0.1) {
+         const currentRoll = planePivot.rotation.z;
+         const levelAmount = -currentRoll * Math.min(1, flight.autoLevel * deltaTime);
+         planePivot.rotateZ(levelAmount);
+       }
+       
+       // Move forward
+       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planePivot.quaternion);
+       planePivot.position.addScaledVector(forward, flight.speed * deltaTime);
+       
+       // Prevent going below ground
+       planePivot.position.y = Math.max(planePivot.position.y, 1);
+       */
+       
+       // Plane stays stationary for now
+       console.log('Flight movement temporarily disabled');
+     }
+    
+    // Update camera
+    function updateCamera(deltaTime) {
+      // Smooth camera follow
+      const desiredPosition = camRig.position.clone().applyQuaternion(planePivot.quaternion).add(planePivot.position);
+      camera.position.lerp(desiredPosition, 1 - Math.exp(-6 * deltaTime));
+      
+      const lookAtTarget = camTarget.position.clone().applyQuaternion(planePivot.quaternion).add(planePivot.position);
+      camera.lookAt(lookAtTarget);
+    }
+    
+    // Update HUD
+    function updateHUD() {
+      // Speed
+      document.getElementById('speedValue').textContent = Math.round(flight.speed) + ' km/h';
+      
+      // Altitude
+      document.getElementById('altitudeValue').textContent = Math.round(planePivot.position.y) + ' m';
+      
+      // Throttle
+      document.getElementById('throttleValue').textContent = Math.round(input.throttle * 100) + '%';
+      
+      // FPS (simplified)
+      const fps = Math.round(1000 / 16.67); // Approximate
+      document.getElementById('fpsValue').textContent = fps;
+    }
+    
+    // Start loading
+    loadThreeJS();
+  </script>
+</body>
+</html>

@@ -55,6 +55,7 @@
       --radius: 14px;
     }
 
+    
     .light {
       --bg: #f5f7fb;
       --card: #ffffff;
@@ -389,6 +390,140 @@
       transform: translateY(0)
     }
 
+    /* ---- Floating TTS Button ---- */
+    .tts-button {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, var(--accent), var(--accent-2));
+      border: none;
+      color: white;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s ease;
+      z-index: 1000;
+    }
+
+    .tts-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px rgba(96, 165, 250, 0.4);
+    }
+
+    .tts-button:active {
+      transform: translateY(0);
+    }
+
+    .tts-button.playing {
+      background: linear-gradient(145deg, var(--warn), #f59e0b);
+      animation: pulse 2s infinite;
+    }
+
+    .tts-button.playing svg {
+      animation: wave 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    @keyframes wave {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .tts-button svg {
+      width: 24px;
+      height: 24px;
+      transition: all .2s ease;
+    }
+
+    .tts-button .stop-icon {
+      display: none;
+    }
+
+    .tts-button.playing .play-icon {
+      display: none;
+    }
+
+    .tts-button.playing .stop-icon {
+      display: block;
+    }
+
+    .tts-controls {
+      position: fixed;
+      bottom: 150px;
+      right: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .25s ease;
+      pointer-events: none;
+      z-index: 999;
+      min-width: 200px;
+    }
+
+    .tts-controls.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .tts-controls h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .tts-controls .control-group {
+      margin-bottom: 12px;
+    }
+
+    .tts-controls label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .tts-controls select,
+    .tts-controls input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--elev);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .tts-controls .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tts-controls .speed-control input {
+      flex: 1;
+    }
+
+    .tts-controls .speed-value {
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 30px;
+    }
+
     footer {
       margin-top: 28px;
       color: var(--muted);
@@ -447,8 +582,8 @@
     <section id="grid" class="grid" aria-live="polite"></section>
 
     <p class="note">
-      Tip: Use the search to filter headlines. Click a tag to pivot the feed. Share button uses your device’s native
-      share if available.
+      Tip: Use the search to filter headlines. Click a tag to pivot the feed. Share button uses your device's native
+      share if available. Press 'T' or click the floating button to read news aloud. Double-click the TTS button for settings.
     </p>
 
     <footer>
@@ -458,6 +593,42 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- TTS Button -->
+  <button class="tts-button" id="ttsButton" title="Read news feed aloud" aria-label="Text-to-speech">
+    <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z"/>
+    </svg>
+    <svg class="stop-icon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6 6h12v12H6z"/>
+    </svg>
+  </button>
+
+  <!-- TTS Controls -->
+  <div class="tts-controls" id="ttsControls">
+    <h3>Text-to-Speech Settings</h3>
+    <div class="control-group">
+      <label for="ttsVoice">Voice:</label>
+      <select id="ttsVoice">
+        <option value="">Loading voices...</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label for="ttsSpeed">Speed:</label>
+      <div class="speed-control">
+        <input type="range" id="ttsSpeed" min="0.5" max="2" step="0.1" value="1">
+        <span class="speed-value" id="speedValue">1.0x</span>
+      </div>
+    </div>
+    <div class="control-group">
+      <label for="ttsPitch">Pitch:</label>
+      <input type="range" id="ttsPitch" min="0.5" max="2" step="0.1" value="1">
+    </div>
+    <div class="control-group">
+      <label for="ttsVolume">Volume:</label>
+      <input type="range" id="ttsVolume" min="0" max="1" step="0.1" value="0.8">
+    </div>
+  </div>
 
   <script>
     // --------------------------
@@ -489,6 +660,13 @@
     let ACTIVE_TOPIC = 'all';
     let QUERY = '';
     let LOADING = false;
+
+    // TTS State
+    let TTS_SPEAKING = false;
+    let TTS_UTTERANCE = null;
+    let TTS_VOICES = [];
+    let TTS_CURRENT_INDEX = 0;
+    let TTS_ITEMS_TO_READ = [];
 
     // --------------------------
     // Utilities
@@ -538,6 +716,174 @@
       el.classList.add('show');
       clearTimeout(showToast._t);
       showToast._t = setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    // --------------------------
+    // TTS Functions
+    // --------------------------
+    // TODO: Future enhancement - Integrate Transformer.js Kokoro TTS for better Japanese voice quality
+    // Current implementation uses Web Speech API as fallback
+    function initTTS() {
+      // Load available voices
+      function loadVoices() {
+        TTS_VOICES = speechSynthesis.getVoices();
+        const voiceSelect = document.getElementById('ttsVoice');
+        voiceSelect.innerHTML = '';
+        
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Default Voice';
+        voiceSelect.appendChild(defaultOption);
+        
+        // Add available voices
+        TTS_VOICES.forEach((voice, index) => {
+          const option = document.createElement('option');
+          option.value = index;
+          option.textContent = `${voice.name} (${voice.lang})`;
+          voiceSelect.appendChild(option);
+        });
+      }
+
+      // Load voices when they become available
+      if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = loadVoices;
+      }
+      loadVoices();
+
+      // Initialize control event listeners
+      initTTSControls();
+    }
+
+    function initTTSControls() {
+      const speedSlider = document.getElementById('ttsSpeed');
+      const speedValue = document.getElementById('speedValue');
+      const pitchSlider = document.getElementById('ttsPitch');
+      const volumeSlider = document.getElementById('ttsVolume');
+
+      speedSlider.addEventListener('input', (e) => {
+        const speed = parseFloat(e.target.value);
+        speedValue.textContent = `${speed.toFixed(1)}x`;
+        if (TTS_UTTERANCE) {
+          TTS_UTTERANCE.rate = speed;
+        }
+      });
+
+      pitchSlider.addEventListener('input', (e) => {
+        const pitch = parseFloat(e.target.value);
+        if (TTS_UTTERANCE) {
+          TTS_UTTERANCE.pitch = pitch;
+        }
+      });
+
+      volumeSlider.addEventListener('input', (e) => {
+        const volume = parseFloat(e.target.value);
+        if (TTS_UTTERANCE) {
+          TTS_UTTERANCE.volume = volume;
+        }
+      });
+    }
+
+    function speakText(text) {
+      if (TTS_UTTERANCE) {
+        speechSynthesis.cancel();
+      }
+
+      TTS_UTTERANCE = new SpeechSynthesisUtterance(text);
+      
+      // Apply current settings
+      const voiceSelect = document.getElementById('ttsVoice');
+      const speedSlider = document.getElementById('ttsSpeed');
+      const pitchSlider = document.getElementById('ttsPitch');
+      const volumeSlider = document.getElementById('ttsVolume');
+
+      if (voiceSelect.value !== '') {
+        TTS_UTTERANCE.voice = TTS_VOICES[parseInt(voiceSelect.value)];
+      }
+      
+      TTS_UTTERANCE.rate = parseFloat(speedSlider.value);
+      TTS_UTTERANCE.pitch = parseFloat(pitchSlider.value);
+      TTS_UTTERANCE.volume = parseFloat(volumeSlider.value);
+
+      // Event handlers
+      TTS_UTTERANCE.onstart = () => {
+        TTS_SPEAKING = true;
+        document.getElementById('ttsButton').classList.add('playing');
+        showToast('Reading news feed...');
+      };
+
+      TTS_UTTERANCE.onend = () => {
+        TTS_SPEAKING = false;
+        document.getElementById('ttsButton').classList.remove('playing');
+        TTS_CURRENT_INDEX++;
+        
+        // Continue with next item if available
+        if (TTS_CURRENT_INDEX < TTS_ITEMS_TO_READ.length) {
+          setTimeout(() => speakNextItem(), 500);
+        } else {
+          showToast('Finished reading news feed');
+          TTS_CURRENT_INDEX = 0;
+        }
+      };
+
+      TTS_UTTERANCE.onerror = (event) => {
+        console.error('TTS Error:', event);
+        TTS_SPEAKING = false;
+        document.getElementById('ttsButton').classList.remove('playing');
+        showToast('TTS error occurred');
+      };
+
+      speechSynthesis.speak(TTS_UTTERANCE);
+    }
+
+    function speakNextItem() {
+      if (TTS_CURRENT_INDEX >= TTS_ITEMS_TO_READ.length) {
+        TTS_CURRENT_INDEX = 0;
+        return;
+      }
+
+      const item = TTS_ITEMS_TO_READ[TTS_CURRENT_INDEX];
+      const text = `From ${item.source}. ${item.title}. Published ${timeAgo(item.publishedAt)}.`;
+      speakText(text);
+    }
+
+    function startTTS() {
+      if (TTS_SPEAKING) {
+        // Stop TTS
+        speechSynthesis.cancel();
+        TTS_SPEAKING = false;
+        document.getElementById('ttsButton').classList.remove('playing');
+        TTS_CURRENT_INDEX = 0;
+        showToast('Stopped reading');
+        return;
+      }
+
+      // Get current filtered items
+      const currentItems = ALL_ITEMS.filter(it => {
+        if (ACTIVE_TOPIC !== 'all') {
+          const tag = tagFromTitle(it.title).key;
+          if (tag !== ACTIVE_TOPIC) return false;
+        }
+        if (QUERY) {
+          const q = QUERY.toLowerCase();
+          return (it.title || '').toLowerCase().includes(q) || (it.source || '').toLowerCase().includes(q);
+        }
+        return true;
+      });
+
+      if (currentItems.length === 0) {
+        showToast('No items to read');
+        return;
+      }
+
+      TTS_ITEMS_TO_READ = currentItems.slice(0, 10); // Limit to first 10 items
+      TTS_CURRENT_INDEX = 0;
+      speakNextItem();
+    }
+
+    function toggleTTSControls() {
+      const controls = document.getElementById('ttsControls');
+      controls.classList.toggle('show');
     }
 
     // --------------------------
@@ -806,10 +1152,15 @@
         render(ALL_ITEMS);
       });
 
+      // TTS Event Listeners
+      document.getElementById('ttsButton').addEventListener('click', startTTS);
+      document.getElementById('ttsButton').addEventListener('dblclick', toggleTTSControls);
+
       // Keyboard: r to refresh, / to focus search
       window.addEventListener('keydown', (e) => {
         if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); loadFeed(); }
         if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); search.focus(); }
+        if (e.key === 't' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); startTTS(); }
       });
     }
 
@@ -820,9 +1171,9 @@
       initTheme();
       initEvents();
       await loadFeed();
+      initTTS(); // Initialize TTS after page load
     })();
   </script>
 </body>
 
 </html>
-```

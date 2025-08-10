@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GLB Flyer — Single Page 3D Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b1020; color: #e7ecf3; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
+    #app { position: fixed; inset: 0; overflow: hidden; }
+    canvas { display: block; outline: none; }
+
+    /* HUD */
+    .hud {
+      position: fixed; left: 16px; top: 16px; max-width: 360px;
+      background: rgba(10, 12, 20, 0.6); border: 1px solid rgba(255,255,255,0.06);
+      padding: 12px 14px; border-radius: 10px; backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .hud h1 { margin: 0 0 8px; font-size: 18px; letter-spacing: 0.3px; }
+    .hud pre { margin: 8px 0 0; font-size: 12px; line-height: 1.35; white-space: pre-wrap; color: #cfd7e6; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .badge { display: inline-block; font-size: 12px; padding: 4px 8px; background: rgba(255,255,255,0.06); border-radius: 999px; }
+
+    /* Right panel */
+    .panel {
+      position: fixed; right: 16px; top: 16px; width: 340px; max-width: calc(100vw - 32px);
+      background: rgba(10, 12, 20, 0.6); border: 1px solid rgba(255,255,255,0.06);
+      padding: 12px 14px; border-radius: 10px; backdrop-filter: blur(6px);
+    }
+    .panel h2 { margin: 0 0 8px; font-size: 16px; }
+    .panel label { display: block; font-size: 12px; margin: 10px 0 4px; color: #cfd7e6; }
+    .panel input[type="file"], .panel select, .panel button, .panel input[type="range"] {
+      width: 100%; font-size: 13px; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04); color: #e7ecf3;
+    }
+    .panel small { color: #9fb0c7; display: block; margin-top: 6px; }
+
+    /* Mini stats footer */
+    .footer {
+      position: fixed; left: 16px; bottom: 12px; display: flex; gap: 10px; align-items: center;
+      background: rgba(10, 12, 20, 0.6); border: 1px solid rgba(255,255,255,0.06);
+      padding: 8px 10px; border-radius: 10px; font-size: 12px;
+    }
+    .kv { display: inline-flex; gap: 6px; padding: 2px 8px; background: rgba(255,255,255,0.04); border-radius: 999px; }
+    a { color: #a2d2ff; text-decoration: none; border-bottom: 1px dotted rgba(162,210,255,0.5); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="hud" id="hud">
+    <h1>GLB Flyer</h1>
+    <div class="row">
+      <span class="badge">W/S: pitch</span>
+      <span class="badge">A/D: yaw</span>
+      <span class="badge">Q/E: roll</span>
+      <span class="badge">Shift/Ctrl: throttle</span>
+      <span class="badge">1–7: switch plane</span>
+      <span class="badge">R: reset</span>
+    </div>
+    <pre id="readout">Loading...</pre>
+  </div>
+
+  <div class="panel">
+    <h2>Load assets</h2>
+
+    <label>Load scene (.glb)</label>
+    <input type="file" id="sceneFile" accept=".glb,.gltf" />
+
+    <label>Load plane (.glb)</label>
+    <input type="file" id="planeFile" accept=".glb,.gltf" />
+    <small>Tip: drag & drop a .glb anywhere to swap the current plane fast.</small>
+
+    <label>Preloaded plane</label>
+    <select id="planeSelect">
+      <option value="plane1.glb">plane1.glb</option>
+      <option value="plane2.glb">plane2.glb</option>
+      <option value="plane3.glb">plane3.glb</option>
+      <option value="plane4.glb">plane4.glb</option>
+      <option value="plane5.glb">plane5.glb</option>
+      <option value="plane6.glb">plane6.glb</option>
+      <option value="plane7.glb">plane7.glb (fallback tries .blg)</option>
+    </select>
+
+    <label>Mouse/Orbit camera (debug)</label>
+    <button id="toggleOrbit">Toggle Orbit Controls</button>
+
+    <label>Camera follow distance</label>
+    <input type="range" id="camDistance" min="4" max="40" step="0.5" value="12" />
+  </div>
+
+  <div class="footer">
+    <span class="kv"><b>Speed</b><span id="speedKV">0</span></span>
+    <span class="kv"><b>Throttle</b><span id="throttleKV">0%</span></span>
+    <span class="kv"><b>FPS</b><span id="fpsKV">—</span></span>
+  </div>
+
+  <!-- Three.js (module) -->
+  <script type="module">
+    // Use CDNs that provide pre-bundled modules to avoid internal dependency issues
+    let THREE, GLTFLoader, OrbitControls;
+    
+    async function loadThreeJS() {
+      try {
+        // Load from skypack.dev which handles module dependencies better
+        THREE = await import('https://cdn.skypack.dev/three@0.161.0');
+        GLTFLoader = await import('https://cdn.skypack.dev/three@0.161.0/examples/jsm/loaders/GLTFLoader.js');
+        OrbitControls = await import('https://cdn.skypack.dev/three@0.161.0/examples/jsm/controls/OrbitControls.js');
+        
+        console.log('All modules loaded successfully from Skypack');
+        
+        // Extract the classes from the modules
+        GLTFLoader = GLTFLoader.GLTFLoader;
+        OrbitControls = OrbitControls.OrbitControls;
+        
+        // Start the application
+        initApp();
+        
+      } catch (e) {
+        console.warn('Skypack failed, trying alternative CDN:', e);
+        
+        try {
+          // Fallback to esm.sh which also handles dependencies well
+          THREE = await import('https://esm.sh/three@0.161.0');
+          GLTFLoader = await import('https://esm.sh/three@0.161.0/examples/jsm/loaders/GLTFLoader.js');
+          OrbitControls = await import('https://esm.sh/three@0.161.0/examples/jsm/controls/OrbitControls.js');
+          
+          console.log('All modules loaded successfully from ESM.sh');
+          
+          // Extract the classes from the modules
+          GLTFLoader = GLTFLoader.GLTFLoader;
+          OrbitControls = OrbitControls.OrbitControls;
+          
+          // Start the application
+          initApp();
+          
+        } catch (e2) {
+          console.error('All CDNs failed:', e2);
+          document.getElementById('readout').textContent = 'Error: Failed to load Three.js. Please check your internet connection and refresh the page.';
+        }
+      }
+    }
+    
+    // Initialize the application after loading Three.js
+    function initApp() {
+      // Core scene setup
+      const app = document.getElementById('app');
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      app.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB); // Bright sky blue instead of dark blue
+      const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 5000);
+      camera.position.set(0, 3, 8);
+
+      // Lights - brighter and more vibrant
+      const hemi = new THREE.HemisphereLight(0xE0F6FF, 0x87CEEB, 1.2); // Brighter sky light, more intense
+      scene.add(hemi);
+      const dirLight = new THREE.DirectionalLight(0xFFFFFF, 1.5); // Brighter directional light
+      dirLight.position.set(60, 100, 30);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.set(2048, 2048);
+      dirLight.shadow.camera.near = 1;
+      dirLight.shadow.camera.far = 400;
+      dirLight.shadow.camera.left = -120;
+      dirLight.shadow.camera.right = 120;
+      dirLight.shadow.camera.top = 120;
+      dirLight.shadow.camera.bottom = -120;
+      scene.add(dirLight);
+
+      // Ground - lighter to match brighter sky
+      const groundGeo = new THREE.PlaneGeometry(2000, 2000);
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x90EE90, metalness: 0, roughness: 1 }); // Light green ground
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI/2;
+      ground.receiveShadow = true;
+      ground.position.y = -0.01;
+      scene.add(ground);
+
+      // Loaders
+      const loader = new GLTFLoader();
+
+      // State
+      const mixers = new Set();
+      let orbitControls = null;
+      let useOrbit = false;
+
+      // Scene container and current plane wrapper (pivot at model center)
+      const sceneRoot = new THREE.Group();
+      scene.add(sceneRoot);
+
+      const planePivot = new THREE.Group();
+      planePivot.position.set(0, 3, 0);
+      scene.add(planePivot);
+
+      // Flight model
+      const input = {
+        pitch: 0, yaw: 0, roll: 0, throttle: 0.5,
+        up: false, down: false, left: false, right: false, rollL: false, rollR: false, boost: false, brake: false
+      };
+      const flight = {
+        speedMin: 6,
+        speedMax: 120,
+        speed: 0,
+        accel: 18,
+        decel: 24,
+        turnRate: THREE.MathUtils.degToRad(60),   // yaw per second at full input
+        pitchRate: THREE.MathUtils.degToRad(55),  // pitch per second
+        rollRate: THREE.MathUtils.degToRad(110),  // roll per second
+        drag: 0.0012,                             // mild quadratic drag
+        autoLevel: THREE.MathUtils.degToRad(22),  // roll leveling per second
+      };
+
+      // Camera follow
+      const camRig = new THREE.Group();
+      const camTarget = new THREE.Object3D();
+      planePivot.add(camRig);
+      planePivot.add(camTarget);
+      camTarget.position.set(0, 1.2, -6);
+      camRig.position.set(0, 2.0, 8.0); // will be adjusted by slider
+      camRig.add(camera);
+
+      // HUD elements
+      const readout = document.getElementById('readout');
+      const speedKV = document.getElementById('speedKV');
+      const throttleKV = document.getElementById('throttleKV');
+      const fpsKV = document.getElementById('fpsKV');
+
+      // UI elements
+      const sceneFile = document.getElementById('sceneFile');
+      const planeFile = document.getElementById('planeFile');
+      const planeSelect = document.getElementById('planeSelect');
+      const toggleOrbitBtn = document.getElementById('toggleOrbit');
+      const camDistance = document.getElementById('camDistance');
+
+      // Helper: load GLB from URL or object URL, return group with centered pivot and fitted scale
+      async function loadGLB(urlOrBlobURL) {
+        const gltf = await loader.loadAsync(urlOrBlobURL);
+        const root = gltf.scene || gltf.scenes[0];
+        root.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+            if (o.material && o.material.map) o.material.map.anisotropy = 8;
+          }
+        });
+
+        // Center and get size
+        const box = new THREE.Box3().setFromObject(root);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+
+        const pivot = new THREE.Group();
+        // Reparent with centered pivot
+        root.position.sub(center);
+        pivot.add(root);
+
+        // Auto-scale extremely large/small assets to a friendly size (approximate 5 unit width)
+        const target = 5;
+        const largest = Math.max(size.x, size.y, size.z) || 1;
+        const scale = THREE.MathUtils.clamp(target / largest, 0.05, 20);
+        pivot.scale.setScalar(scale);
+
+        return { pivot, gltf };
+      }
+
+      // Asset management
+      let currentPlane = null;
+      let currentPlaneMixer = null;
+
+      async function setPlaneFromURL(url, options = { tryAltFor7: false }) {
+        try {
+          const { pivot, gltf } = await loadGLB(url);
+          swapPlane(pivot, gltf);
+        } catch (e) {
+          // Fallback for plane7.blg typo case
+          if (options.tryAltFor7 && url.endsWith('plane7.glb')) {
+            try {
+              const { pivot, gltf } = await loadGLB('plane7.blg');
+              swapPlane(pivot, gltf);
+              return;
+            } catch (e2) {
+              console.warn('Failed loading plane7.blg fallback:', e2);
+              console.error('Original error:', e);
+            }
+          } else {
+            console.error('Failed to load plane:', url, e);
+          }
+        }
+      }
+
+      function swapPlane(pivot, gltf) {
+        // Remove previous
+        if (currentPlane) {
+          planePivot.remove(currentPlane);
+          currentPlane.traverse(o => { if (o.geometry) o.geometry.dispose?.(); if (o.material) o.material.dispose?.(); });
+          currentPlane = null;
+        }
+        if (currentPlaneMixer) {
+          mixers.delete(currentPlaneMixer);
+          currentPlaneMixer.uncacheRoot(currentPlaneMixer.getRoot());
+          currentPlaneMixer = null;
+        }
+
+        // Attach
+        pivot.rotation.set(0, Math.PI, 0); // face forward (-Z) common convention
+        planePivot.add(pivot);
+        currentPlane = pivot;
+
+        // Play first animation if present (e.g., propeller)
+        if (gltf.animations && gltf.animations.length) {
+          const mixer = new THREE.AnimationMixer(pivot);
+          const action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+          mixers.add(mixer);
+          currentPlaneMixer = mixer;
+        }
+
+        // Reset kinematics on swap, keep throttle
+        planePivot.position.set(0, 3, 0);
+        planePivot.rotation.set(0, 0, 0);
+        flight.speed = THREE.MathUtils.lerp(flight.speedMin, flight.speedMax, input.throttle);
+
+        // Update UI
+        readout.textContent = `Plane loaded: ✓  (tris will vary)
+Keys: W/S pitch | A/D yaw | Q/E roll | Shift/Ctrl throttle | 1–7 switch | R reset`;
+      }
+
+      let currentScene = null;
+      async function setSceneFromURL(url) {
+        try {
+          const { pivot } = await loadGLB(url);
+          // Cleanup old scene
+          if (currentScene) {
+            sceneRoot.remove(currentScene);
+            currentScene.traverse(o => { if (o.geometry) o.geometry.dispose?.(); if (o.material) o.material.dispose?.(); });
+          }
+          // Scenes usually should not be auto-scaled to tiny sizes: relax scaling rule
+          // But loadGLB already normalized sizes; so if scene has large terrain, you may re-scale:
+          pivot.scale.multiplyScalar(10);
+          sceneRoot.add(pivot);
+          currentScene = pivot;
+        } catch (e) {
+          console.error('Failed to load scene:', e);
+        }
+      }
+
+      // File inputs
+      sceneFile.addEventListener('change', (e) => {
+        const f = e.target.files?.[0];
+        if (f) setSceneFromURL(URL.createObjectURL(f));
+      });
+      planeFile.addEventListener('change', (e) => {
+        const f = e.target.files?.[0];
+        if (f) {
+          setPlaneFromURL(URL.createObjectURL(f));
+          planeSelect.value = ''; // clear selection
+        }
+      });
+      planeSelect.addEventListener('change', (e) => {
+        const v = e.target.value;
+        if (!v) return;
+        setPlaneFromURL(v, { tryAltFor7: v === 'plane7.glb' });
+      });
+
+      // Drag & Drop for quick plane swap
+      document.addEventListener('dragover', (e) => { e.preventDefault(); });
+      document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const f = [...(e.dataTransfer?.files || [])].find(f => /(\.glb|\.gltf)$/i.test(f.name));
+        if (f) setPlaneFromURL(URL.createObjectURL(f));
+      });
+
+      // Orbit controls toggle (debug)
+      toggleOrbitBtn.addEventListener('click', () => {
+        useOrbit = !useOrbit;
+        if (useOrbit && !orbitControls) {
+          orbitControls = new OrbitControls(camera, renderer.domElement);
+          orbitControls.enableDamping = true;
+        }
+        if (orbitControls) {
+          orbitControls.enabled = useOrbit;
+          if (useOrbit) orbitControls.target.copy(planePivot.position);
+        }
+        toggleOrbitBtn.textContent = useOrbit ? 'Disable Orbit Controls' : 'Enable Orbit Controls';
+      });
+
+      camDistance.addEventListener('input', (e) => {
+        const d = parseFloat(e.target.value);
+        camRig.position.set(0, d * 0.22 + 1.2, d);
+      });
+
+      // Keyboard input
+      const key = {};
+      function onKey(e, down) {
+        key[e.code] = down;
+        if (!down) return;
+
+        // Plane quick select
+        if (/^Digit[1-7]$/.test(e.code)) {
+          const n = e.code.slice(-1);
+          const fname = `plane${n}.glb`;
+          planeSelect.value = fname;
+          setPlaneFromURL(fname, { tryAltFor7: n === '7' });
+        }
+        if (e.code === 'KeyR') {
+          planePivot.position.set(0, 3, 0);
+          planePivot.rotation.set(0, 0, 0);
+          flight.speed = THREE.MathUtils.lerp(flight.speedMin, flight.speedMax, input.throttle);
+        }
+      }
+      window.addEventListener('keydown', (e) => onKey(e, true));
+      window.addEventListener('keyup',   (e) => onKey(e, false));
+
+      function updateInput(dt) {
+        // Axes
+        input.pitch = (key['KeyW'] ? -1 : 0) + (key['KeyS'] ? 1 : 0);
+        input.yaw   = (key['KeyA'] ? 1 : 0) + (key['KeyD'] ? -1 : 0);
+        input.roll  = (key['KeyQ'] ? 1 : 0) + (key['KeyE'] ? -1 : 0);
+        // Throttle
+        if (key['ShiftLeft'] || key['ShiftRight']) input.throttle = Math.min(1, input.throttle + 0.6 * dt);
+        if (key['ControlLeft'] || key['ControlRight']) input.throttle = Math.max(0, input.throttle - 0.6 * dt);
+      }
+
+      // Initial loads
+      setSceneFromURL('scene.glb');                 // Will succeed if present
+      setPlaneFromURL('plane1.glb');                // Active control plane
+      setPlaneFromURL('plane2.glb');                // Preload in browser cache
+      setPlaneFromURL('plane3.glb');                // (no attach)
+      setPlaneFromURL('plane4.glb');
+      setPlaneFromURL('plane5.glb');
+      setPlaneFromURL('plane6.glb');
+      setPlaneFromURL('plane7.glb', { tryAltFor7: true });
+
+      // Resize handling
+      window.addEventListener('resize', () => {
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+
+      // FPS simple tracker
+      let frames = 0, timeAcc = 0, fps = 0;
+
+      // Main loop
+      const clock = new THREE.Clock();
+      function tick() {
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        // Input and throttle -> speed
+        updateInput(dt);
+        const targetSpeed = THREE.MathUtils.lerp(flight.speedMin, flight.speedMax, input.throttle);
+        const accel = targetSpeed > flight.speed ? flight.accel : flight.decel;
+        flight.speed += (targetSpeed - flight.speed) * (1 - Math.exp(-accel * dt));
+        // Drag (quadratic, mild)
+        flight.speed -= flight.drag * flight.speed * flight.speed * dt;
+        flight.speed = THREE.MathUtils.clamp(flight.speed, flight.speedMin * 0.5, flight.speedMax * 1.2);
+
+        // Rotations (scaled by speed factor for a nice feel)
+        const speedFactor = THREE.MathUtils.clamp((flight.speed - flight.speedMin) / (flight.speedMax - flight.speedMin), 0, 1);
+        const pitch = input.pitch * flight.pitchRate * dt * (0.7 + 0.6 * speedFactor);
+        const yaw   = input.yaw   * flight.turnRate  * dt * (0.7 + 0.6 * speedFactor);
+        const roll  = input.roll  * flight.rollRate  * dt * (0.7 + 0.6 * speedFactor);
+
+        planePivot.rotateX(pitch);
+        planePivot.rotateY(yaw);
+        planePivot.rotateZ(roll);
+
+        // Gentle auto-level on roll when no roll input
+        if (Math.abs(input.roll) < 0.02) {
+          const r = planePivot.rotation.z;
+          const level = -r * Math.min(1, flight.autoLevel * dt);
+          planePivot.rotateZ(level);
+        }
+
+        // Advance forward in local -Z
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planePivot.quaternion).normalize();
+        planePivot.position.addScaledVector(forward, flight.speed * dt);
+
+        // Prevent tunneling below simple ground plane
+        planePivot.position.y = Math.max(planePivot.position.y, 0.5);
+
+        // Camera follow (smooth chase)
+        // Desired camera position relative to plane
+        const desired = camRig.position.clone();
+        desired.applyQuaternion(planePivot.quaternion);
+        desired.add(planePivot.position);
+
+        // Smoothly move camera
+        camera.position.lerp(desired, 1 - Math.exp(-8 * dt));
+        const lookAt = camTarget.position.clone().applyQuaternion(planePivot.quaternion).add(planePivot.position);
+        camera.lookAt(lookAt);
+
+        // Orbit controls (debug)
+        if (orbitControls && orbitControls.enabled) {
+          orbitControls.target.lerp(planePivot.position, 1 - Math.exp(-6 * dt));
+          orbitControls.update();
+        }
+
+        // Mixers
+        mixers.forEach(m => m.update(dt));
+
+        // Lights follow
+        dirLight.position.lerp(new THREE.Vector3().copy(planePivot.position).add(new THREE.Vector3(60, 100, 30)), 1 - Math.exp(-1.5 * dt));
+
+        renderer.render(scene, camera);
+
+        // HUD updates
+        speedKV.textContent = flight.speed.toFixed(1);
+        throttleKV.textContent = Math.round(input.throttle * 100) + '%';
+        frames++; timeAcc += dt;
+        if (timeAcc >= 0.5) { fps = Math.round(frames / timeAcc); frames = 0; timeAcc = 0; fpsKV.textContent = fps; }
+
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // Start loading Three.js
+    loadThreeJS().catch(error => {
+      console.error('Failed to load Three.js:', error);
+      document.getElementById('readout').textContent = 'Error: Failed to load Three.js. Please check your internet connection and refresh the page.';
+    });
+  </script>
+</body>
+</html>
