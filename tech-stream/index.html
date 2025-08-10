@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TechStream — Latest AI, Engineering, and Tech News</title>
+  <meta name="description"
+    content="A sleek, single-file news aggregator for AI, engineering, and technology stories." />
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+  <style>
+    /* ---- CSS Reset (minimal) ---- */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0
+    }
+
+    img {
+      max-width: 100%;
+      display: block
+    }
+
+    button,
+    input {
+      font: inherit
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit
+    }
+
+    /* ---- Theme Variables ---- */
+    :root {
+      --bg: #0b0f14;
+      --card: #0f1520;
+      --elev: #111927;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e6edf3;
+      --muted: #9fb0c0;
+      --accent: #60a5fa;
+      /* sky-400 */
+      --accent-2: #a78bfa;
+      /* violet-400 */
+      --good: #34d399;
+      --warn: #fbbf24;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      --radius: 14px;
+    }
+
+    .light {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --elev: #ffffff;
+      --border: rgba(0, 0, 0, 0.08);
+      --text: #0b1220;
+      --muted: #4a5568;
+      --accent: #2563eb;
+      --accent-2: #7c3aed;
+      --shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, rgba(96, 165, 250, 0.15), transparent 60%),
+        radial-gradient(1000px 700px at 110% 10%, rgba(167, 139, 250, 0.14), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100svh;
+    }
+
+    /* ---- Layout ---- */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 6px 0 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, var(--accent), var(--accent-2));
+      box-shadow: 0 8px 18px rgba(96, 165, 250, 0.35), inset 0 0 14px rgba(255, 255, 255, 0.18);
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title h1 {
+      font-size: clamp(20px, 2.4vw, 28px);
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .title .sub {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .search input {
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      width: 210px;
+    }
+
+    .chipbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0 8px;
+    }
+
+    .chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--card), var(--elev));
+      color: var(--text);
+      cursor: pointer;
+      transition: transform .12s ease, background .2s ease, border-color .2s ease;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .chip:hover {
+      transform: translateY(-1px)
+    }
+
+    .chip.active {
+      background: linear-gradient(145deg, rgba(96, 165, 250, 0.20), rgba(167, 139, 250, 0.18));
+      border-color: rgba(99, 102, 241, 0.5);
+    }
+
+    .btn {
+      padding: 9px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--card), var(--elev));
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow);
+      transition: transform .12s ease, filter .2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px)
+    }
+
+    .btn .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 10px var(--good)
+    }
+
+    .sep {
+      width: 1px;
+      height: 28px;
+      background: var(--border);
+      margin: 0 4px;
+      border-radius: 1px
+    }
+
+    /* ---- Grid ---- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .card {
+      grid-column: span 12;
+      background: linear-gradient(180deg, var(--card), var(--elev));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform .18s ease, border-color .2s ease, background .25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px)
+    }
+
+    @media (min-width:640px) {
+      .card {
+        grid-column: span 6
+      }
+    }
+
+    @media (min-width:960px) {
+      .card {
+        grid-column: span 4
+      }
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .meta .src {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .favicon {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid var(--border)
+    }
+
+    .titleline {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(96, 165, 250, 0.12);
+      color: #b3d5ff;
+    }
+
+    .tag.purple {
+      background: rgba(167, 139, 250, 0.14);
+      color: #d8cbff
+    }
+
+    .tag.green {
+      background: rgba(52, 211, 153, 0.14);
+      color: #b9f6de
+    }
+
+    .tag.orange {
+      background: rgba(251, 191, 36, 0.14);
+      color: #ffe4a3
+    }
+
+    .tag.gray {
+      background: rgba(148, 163, 184, 0.15);
+      color: #e5edf5
+    }
+
+    .card .links {
+      margin-left: auto;
+      display: flex;
+      gap: 8px
+    }
+
+    .iconbtn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--card), var(--elev));
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: transform .12s ease;
+    }
+
+    .iconbtn:hover {
+      transform: translateY(-1px)
+    }
+
+    /* ---- Skeletons ---- */
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+
+    .shimmer {
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      animation: shimmer 1.2s infinite;
+    }
+
+    @keyframes shimmer {
+      100% {
+        transform: translateX(100%)
+      }
+    }
+
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .25s ease;
+      pointer-events: none;
+      font-size: 14px;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0)
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo">TS</div>
+        <div class="title">
+          <h1>TechStream</h1>
+          <div class="sub">Latest from AI, engineering, and tech — refreshed live.</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="search" title="Search headlines">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input id="search" type="search" placeholder="Search AI, LLMs, Kubernetes..." />
+          <button class="btn" id="clearSearch" title="Clear search" style="display:none">Clear</button>
+        </div>
+        <span class="sep" aria-hidden="true"></span>
+        <button class="btn" id="refreshBtn" title="Refresh feed">
+          <span class="dot" aria-hidden="true"></span> Refresh
+        </button>
+        <button class="btn" id="themeBtn" title="Toggle theme">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M21.64 13a9 9 0 1 1-10.63-10.6 7 7 0 1 0 10.63 10.6z" />
+          </svg>
+          Theme
+        </button>
+      </div>
+    </header>
+
+    <div class="chipbar" id="chipbar" role="tablist" aria-label="Topics">
+      <button class="chip active" data-topic="all" role="tab" aria-selected="true">All</button>
+      <button class="chip" data-topic="ai" role="tab">AI</button>
+      <button class="chip" data-topic="engineering" role="tab">Engineering</button>
+      <button class="chip" data-topic="security" role="tab">Security</button>
+      <button class="chip" data-topic="gadgets" role="tab">Gadgets</button>
+    </div>
+
+    <section id="grid" class="grid" aria-live="polite"></section>
+
+    <p class="note">
+      Tip: Use the search to filter headlines. Click a tag to pivot the feed. Share button uses your device’s native
+      share if available.
+    </p>
+
+    <footer>
+      Built as a single-file demo. Sources: Google News (RSS), TechCrunch (RSS), Hacker News (Algolia). Some feeds use a
+      public CORS proxy.
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // --------------------------
+    // Config
+    // --------------------------
+    const CONFIG = {
+      // Using a public CORS proxy to fetch RSS in the browser
+      PROXY: 'https://api.allorigins.win/raw?url=',
+      LIMIT_PER_SOURCE: 20,
+      TOTAL_LIMIT: 60,
+      // Queries/feeds tuned for AI + engineering + general tech
+      googleNewsQueries: [
+        'AI OR "large language model" OR "machine learning"',
+        '"software engineering" OR devops OR kubernetes',
+        'technology OR startups OR cloud'
+      ],
+      rssFeeds: [
+        { url: 'https://techcrunch.com/feed/', name: 'TechCrunch' },
+        { url: 'https://www.theverge.com/rss/index.xml', name: 'The Verge' },
+        { url: 'https://feeds.arstechnica.com/arstechnica/technology-lab', name: 'Ars Technica' }
+      ],
+      hnQueries: ['AI', 'LLM', 'engineering', 'tech']
+    };
+
+    // --------------------------
+    // State
+    // --------------------------
+    let ALL_ITEMS = [];
+    let ACTIVE_TOPIC = 'all';
+    let QUERY = '';
+    let LOADING = false;
+
+    // --------------------------
+    // Utilities
+    // --------------------------
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    function timeAgo(date) {
+      const now = new Date();
+      const diff = Math.floor((now - date) / 1000);
+      if (diff < 60) return `${diff}s ago`;
+      const m = Math.floor(diff / 60);
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      const d = Math.floor(h / 24);
+      if (d < 7) return `${d}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    function getDomain(url) {
+      try { return new URL(url).hostname.replace(/^www\./, ''); }
+      catch { return ''; }
+    }
+
+    function tagFromTitle(title) {
+      const t = (title || '').toLowerCase();
+      if (/\b(ai|gpt|llm|machine learning|deep learning|openai|anthropic|cohere)\b/.test(t)) return { key: 'ai', cls: '', label: 'AI' };
+      if (/\b(engineering|software|developer|programming|kubernetes|devops|cloud|microservice|architecture)\b/.test(t)) return { key: 'engineering', cls: 'green', label: 'Engineering' };
+      if (/\b(security|vulnerability|breach|cve|ransomware|patch)\b/.test(t)) return { key: 'security', cls: 'orange', label: 'Security' };
+      if (/\b(phone|laptop|device|headset|camera|earbuds|gadget|review)\b/.test(t)) return { key: 'gadgets', cls: 'purple', label: 'Gadgets' };
+      return { key: 'general', cls: 'gray', label: 'General' };
+    }
+
+    function dedupe(items) {
+      const seen = new Set();
+      const out = [];
+      for (const it of items) {
+        const key = (it.url || it.link || '') + '|' + (it.title || '');
+        if (!seen.has(key)) { seen.add(key); out.push(it); }
+      }
+      return out;
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    // --------------------------
+    // Fetchers
+    // --------------------------
+    async function fetchGoogleNews(query) {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+      const proxied = CONFIG.PROXY + encodeURIComponent(url);
+      const res = await fetch(proxied);
+      if (!res.ok) throw new Error('Google News fetch failed');
+      const xml = await res.text();
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const items = [...doc.querySelectorAll('item')].slice(0, CONFIG.LIMIT_PER_SOURCE);
+      return items.map(item => {
+        const title = item.querySelector('title')?.textContent?.trim() || 'Untitled';
+        const link = item.querySelector('link')?.textContent?.trim() || '#';
+        const pubDate = new Date(item.querySelector('pubDate')?.textContent || Date.now());
+        const source = item.querySelector('source')?.textContent?.trim() || getDomain(link) || 'Google News';
+        return { title, url: link, source, publishedAt: pubDate };
+      });
+    }
+
+    async function fetchRSS(feedUrl, name) {
+      const res = await fetch(CONFIG.PROXY + encodeURIComponent(feedUrl));
+      if (!res.ok) throw new Error('RSS fetch failed: ' + name);
+      const xml = await res.text();
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      let items = [...doc.querySelectorAll('item')];
+      if (!items.length) items = [...doc.querySelectorAll('entry')]; // Atom
+      items = items.slice(0, CONFIG.LIMIT_PER_SOURCE);
+      return items.map(item => {
+        const title = item.querySelector('title')?.textContent?.trim() || 'Untitled';
+        const link = item.querySelector('link')?.getAttribute('href') || item.querySelector('link')?.textContent?.trim() || '#';
+        const pubRaw = item.querySelector('pubDate')?.textContent || item.querySelector('updated')?.textContent || item.querySelector('published')?.textContent;
+        const publishedAt = new Date(pubRaw || Date.now());
+        return { title, url: link, source: name || getDomain(link), publishedAt };
+      });
+    }
+
+    async function fetchHN(query) {
+      const url = `https://hn.algolia.com/api/v1/search_by_date?tags=story&query=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HN fetch failed');
+      const data = await res.json();
+      return (data.hits || []).slice(0, CONFIG.LIMIT_PER_SOURCE).map(h => ({
+        title: h.title || 'Untitled',
+        url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+        source: 'Hacker News',
+        publishedAt: new Date(h.created_at)
+      }));
+    }
+
+    // --------------------------
+    // Rendering
+    // --------------------------
+    function cardTemplate(item) {
+      const domain = getDomain(item.url);
+      const tag = tagFromTitle(item.title);
+      const fav = domain ? `https://www.google.com/s2/favicons?sz=64&domain=${domain}` : '';
+      return `
+        <article class="card" data-topic="${tag.key}">
+          <div class="meta">
+            <div class="src">
+              <img class="favicon" src="${fav}" alt="" loading="lazy" />
+              <span>${item.source || domain || 'Source'}</span>
+            </div>
+            <span aria-hidden="true">•</span>
+            <time datetime="${item.publishedAt.toISOString()}">${timeAgo(item.publishedAt)}</time>
+          </div>
+          <a class="titleline" href="${item.url}" target="_blank" rel="noopener">
+            ${item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+          </a>
+          <div class="actions">
+            <span class="tag ${tag.cls}">${tag.label}</span>
+            <div class="links">
+              <button class="iconbtn" title="Open source site" onclick="window.open('https://${domain}','_blank','noopener')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </button>
+              <button class="iconbtn" title="Share" onclick="shareItem('${encodeURIComponent(item.title)}','${encodeURIComponent(item.url)}')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+              </button>
+              <a class="iconbtn" title="Open link" href="${item.url}" target="_blank" rel="noopener">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10 13a5 5 0 0 0 7.07 0l3.54-3.54a5 5 0 0 0-7.07-7.07L12 4"/>
+                  <path d="M14 11a5 5 0 0 0-7.07 0L3.39 14.54a5 5 0 1 0 7.07 7.07L12 20"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderSkeleton(count = 9) {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `
+          <div class="meta">
+            <div class="favicon skeleton" style="width:16px;height:16px;position:relative;"><div class="shimmer"></div></div>
+            <div class="skeleton" style="width:120px;height:12px;position:relative;border-radius:4px;"><div class="shimmer"></div></div>
+            <span aria-hidden="true">•</span>
+            <div class="skeleton" style="width:60px;height:12px;position:relative;border-radius:4px;"><div class="shimmer"></div></div>
+          </div>
+          <div class="skeleton" style="width:100%;height:20px;position:relative;"><div class="shimmer"></div></div>
+          <div class="actions">
+            <div class="skeleton" style="width:70px;height:22px;border-radius:8px;position:relative;"><div class="shimmer"></div></div>
+            <div class="links" style="margin-left:auto;display:flex;gap:8px">
+              <div class="skeleton" style="width:34px;height:34px;border-radius:10px;position:relative;"><div class="shimmer"></div></div>
+              <div class="skeleton" style="width:34px;height:34px;border-radius:10px;position:relative;"><div class="shimmer"></div></div>
+              <div class="skeleton" style="width:34px;height:34px;border-radius:10px;position:relative;"><div class="shimmer"></div></div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(el);
+      }
+    }
+
+    function render(items) {
+      const grid = document.getElementById('grid');
+      const filtered = items
+        .filter(it => {
+          if (ACTIVE_TOPIC !== 'all') {
+            const tag = tagFromTitle(it.title).key;
+            if (tag !== ACTIVE_TOPIC) return false;
+          }
+          if (QUERY) {
+            const q = QUERY.toLowerCase();
+            return (it.title || '').toLowerCase().includes(q) || (it.source || '').toLowerCase().includes(q);
+          }
+          return true;
+        });
+      grid.innerHTML = filtered.map(cardTemplate).join('') || `
+        <div class="card">
+          <div class="titleline">No results.</div>
+          <div class="actions"><span class="tag gray">Try another topic or search</span></div>
+        </div>
+      `;
+    }
+
+    // --------------------------
+    // Sharing
+    // --------------------------
+    async function shareItem(titleEnc, urlEnc) {
+      const title = decodeURIComponent(titleEnc);
+      const url = decodeURIComponent(urlEnc);
+      if (navigator.share) {
+        try { await navigator.share({ title, url }); }
+        catch (e) { /* user canceled */ }
+      } else {
+        try {
+          await navigator.clipboard.writeText(`${title} — ${url}`);
+          showToast('Link copied to clipboard');
+        } catch {
+          showToast('Unable to copy link');
+        }
+      }
+    }
+    window.shareItem = shareItem;
+
+    // --------------------------
+    // Load all sources
+    // --------------------------
+    async function loadFeed() {
+      if (LOADING) return;
+      LOADING = true;
+      document.getElementById('refreshBtn').disabled = true;
+      renderSkeleton(9);
+
+      try {
+        const tasks = [];
+
+        // Google News queries
+        for (const q of CONFIG.googleNewsQueries) {
+          tasks.push(fetchGoogleNews(q));
+        }
+
+        // RSS feeds
+        for (const f of CONFIG.rssFeeds) {
+          tasks.push(fetchRSS(f.url, f.name));
+        }
+
+        // Hacker News
+        for (const q of CONFIG.hnQueries) {
+          tasks.push(fetchHN(q));
+        }
+
+        const results = await Promise.allSettled(tasks);
+        const merged = [];
+        for (const r of results) {
+          if (r.status === 'fulfilled') merged.push(...r.value);
+        }
+
+        // Dedupe, sort, limit
+        ALL_ITEMS = dedupe(merged)
+          .sort((a, b) => b.publishedAt - a.publishedAt)
+          .slice(0, CONFIG.TOTAL_LIMIT);
+
+        render(ALL_ITEMS);
+        showToast(`Loaded ${ALL_ITEMS.length} stories`);
+      } catch (e) {
+        console.error(e);
+        showToast('Some sources failed to load');
+        render(ALL_ITEMS || []);
+      } finally {
+        LOADING = false;
+        document.getElementById('refreshBtn').disabled = false;
+      }
+    }
+
+    // --------------------------
+    // Interactions
+    // --------------------------
+    function setActiveChip(topic) {
+      ACTIVE_TOPIC = topic;
+      document.querySelectorAll('.chip').forEach(c => {
+        const active = c.dataset.topic === topic;
+        c.classList.toggle('active', active);
+        c.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      render(ALL_ITEMS);
+    }
+
+    function initTheme() {
+      const saved = localStorage.getItem('techstream-theme') || '';
+      if (saved === 'light') document.body.classList.add('light');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light');
+      localStorage.setItem('techstream-theme', document.body.classList.contains('light') ? 'light' : 'dark');
+    }
+
+    function initEvents() {
+      document.getElementById('refreshBtn').addEventListener('click', loadFeed);
+      document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+
+      document.getElementById('chipbar').addEventListener('click', (e) => {
+        const btn = e.target.closest('.chip');
+        if (!btn) return;
+        setActiveChip(btn.dataset.topic);
+      });
+
+      const search = document.getElementById('search');
+      const clear = document.getElementById('clearSearch');
+      let t;
+      search.addEventListener('input', () => {
+        QUERY = search.value.trim();
+        clear.style.display = QUERY ? 'inline-flex' : 'none';
+        clearTimeout(t);
+        t = setTimeout(() => render(ALL_ITEMS), 120);
+      });
+      clear.addEventListener('click', () => {
+        search.value = '';
+        QUERY = '';
+        clear.style.display = 'none';
+        render(ALL_ITEMS);
+      });
+
+      // Keyboard: r to refresh, / to focus search
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); loadFeed(); }
+        if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); search.focus(); }
+      });
+    }
+
+    // --------------------------
+    // Boot
+    // --------------------------
+    (async function boot() {
+      initTheme();
+      initEvents();
+      await loadFeed();
+    })();
+  </script>
+</body>
+
+</html>
+```
